@@ -1,1 +1,22 @@
-[{"id": "site1-en", "host": "your-site1.com", "feedUrl": "https://your-site1.com/feed.en.json", "indexNowKeyEnv": "INDEXNOW_API_KEY_YOURSITE1", "pingOMatic": {"title": "Your Site 1 English Blog", "blogUrl": "https://your-site1.com/en/", "rssUrl": "https://your-site1.com/feed.en.xml"}}, {"id": "site1-ja", "host": "your-site1.com", "feedUrl": "https://your-site1.com/feed.ja.json", "indexNowKeyEnv": "INDEXNOW_API_KEY_YOURSITE1", "pingOMatic": {"title": "Your Site 1 Japanese Blog", "blogUrl": "https://your-site1.com/ja/", "rssUrl": "https://your-site1.com/feed.ja.xml"}}]
+[{
+  "id": "site1-en", 
+  "host": "your-site1.com", 
+  "feedUrl": "https://your-site1.com/feed.en.json", 
+  "indexNowKeyEnv": "INDEXNOW_API_KEY_YOURSITE1", 
+  "pingOMatic": {
+    "title": "Your Site 1 English Blog", 
+    "blogUrl": "https://your-site1.com/en/", 
+    "rssUrl": "https://your-site1.com/feed.en.xml"}
+  }, 
+  {
+    "id": "site1-ja", 
+    "host": "your-site1.com", 
+    "feedUrl": "https://your-site1.com/feed.ja.json", 
+    "indexNowKeyEnv": "INDEXNOW_API_KEY_YOURSITE1", 
+    "pingOMatic": {
+      "title": "Your Site 1 Japanese Blog", 
+      "blogUrl": "https://your-site1.com/ja/", 
+      "rssUrl": "https://your-site1.com/feed.ja.xml"
+    }
+  }
+]
