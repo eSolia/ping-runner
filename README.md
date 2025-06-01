@@ -3,11 +3,11 @@ Pings indexnow and ping-o-matic for new items in rss feeds from listed sites.
 
 ## Setup and Deployment Instructions
 
-This guide walks you through setting up and deploying the Deno Deploy script for multi-site IndexNow and Ping-O-Matic submission.
+This guide walks you through setting up and deploying a Deno Deploy script for multi-site IndexNow and Ping-O-Matic submission.
 
-### Key Changes and How to Set Up
+### How to Set Up
 
-This enhanced script uses **Environment Variables** for configuration and **Deno KV (Key-Value Store)** for persistent storage of `SITE_CONFIG` and `lastCheckedTime` for each feed.
+This script uses **Environment Variables** for configuration and **Deno KV (Key-Value Store)** for persistent storage of `SITE_CONFIG` and `lastCheckedTime` for each feed.
 
 1.  **Update `main.js`:**
     * Copy and paste the entire script provided earlier into your `main.js` file.
