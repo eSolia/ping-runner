@@ -1,5 +1,4 @@
 // main.ts - Deno Deploy script for multi-site IndexNow and Ping-O-Matic submission
-// main.ts - Deno Deploy script for multi-site IndexNow and Ping-O-Matic submission
 import './cron.ts'; // Assuming cron.ts handles scheduling logic separately
 
 // --- Type Definitions ---
