@@ -1,4 +1,5 @@
 // main.js - Deno Deploy script for multi-site IndexNow and Ping-O-Matic submission
+import './cron.ts'
 
 // --- Configuration via Environment Variables ---
 // These values should be set in your Deno Deploy project settings.
