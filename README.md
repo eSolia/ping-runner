@@ -70,7 +70,7 @@ This script uses **Environment Variables** for storing configuration of API keys
 
     * **IndexNow API Keys**:
         * For *each unique IndexNow API key* you have, add a separate environment variable.
-        * For example, if `SITE_CONFIG` uses `INDEXNOW_API_KEY_YOURSITE1` and `INDEXNOW_API_KEY_YOURSITE2`, you'll need to create two environment variables:
+        * For example, if `SITE_CONFIG` uses `INDEXNOW_API_KEY_1` and `INDEXNOW_API_KEY_2`, you'll need to create two environment variables:
             * `INDEXNOW_API_KEY_1 = "YOUR_ACTUAL_KEY_FOR_SITE1"`
             * `INDEXNOW_API_KEY_2 = "YOUR_ACTUAL_KEY_FOR_SITE2"`
         * Mark these as "Secret" in Deno Deploy for security.
