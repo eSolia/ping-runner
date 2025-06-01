@@ -1,5 +1,6 @@
 // main.ts - Deno Deploy script for multi-site IndexNow and Ping-O-Matic submission
-import { decode } from "https://deno.land/std@0.224.0/encoding/base64.ts"; // For Basic Auth of Simple Admin UI
+// CORRECTED IMPORT: decodeBase64 instead of decode
+import { decodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
 // --- Type Definitions ---
 interface PingOMaticConfig {
@@ -52,7 +53,7 @@ async function setSiteConfigs(configs: SiteConfig[]): Promise<void> {
   await kv.set(SITE_CONFIG_KV_KEY, configs);
 }
 
-// --- Helper Function to fetch Feed JSON ---
+// --- Helper Function to fetch JSON ---
 async function fetchJsonFeed(url: string): Promise<JsonFeed | null> {
   try {
     const response: Response = await fetch(url);
@@ -66,18 +67,18 @@ async function fetchJsonFeed(url: string): Promise<JsonFeed | null> {
   }
 }
 
-// --- Helper Function to get last checked timestamp of Feed ---
+// --- Helper Function to get last checked timestamp ---
 async function getLastChecked(feedId: string): Promise<Date | null> {
   const result: Deno.KvEntryMaybe<string> = await kv.get([LAST_CHECK_KEY_PREFIX + feedId]);
   return result.value ? new Date(result.value) : null;
 }
 
-// --- Helper Function to set last checked timestamp of Feed ---
+// --- Helper Function to set last checked timestamp ---
 async function setLastChecked(feedId: string, timestamp: Date): Promise<void> {
   await kv.set([LAST_CHECK_KEY_PREFIX + feedId], timestamp.toISOString());
 }
 
-// --- Helper Function to check if a listed post is new or updated ---
+// --- Helper Function to check if a post is new or updated ---
 function isPostNewOrUpdated(post: Post, lastCheckedTime: Date | null): boolean {
   const publishedDate: Date = new Date(
     (post.date_published || post.published || post.date) as string,
@@ -243,7 +244,8 @@ function basicAuth(request: Request): Response | null {
   }
 
   const encoded = authHeader.substring(6); // "Basic ".length is 6
-  const decoded = new TextDecoder().decode(decode(encoded));
+  // CORRECTED USAGE: decodeBase64 instead of decode
+  const decoded = new TextDecoder().decode(decodeBase64(encoded));
   const [username, password] = decoded.split(":");
 
   if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
@@ -421,7 +423,6 @@ addEventListener("fetch", async (event: FetchEvent) => {
 
       if (!Array.isArray(siteConfigs) || siteConfigs.length === 0) {
         console.warn(`[${new Date().toISOString()}] No site configurations found in Deno KV. Skipping cron job processing.`);
-        // No return here, as we already responded to the event.
         return;
       }
 
@@ -439,7 +440,7 @@ addEventListener("fetch", async (event: FetchEvent) => {
           console.error(error.stack);
       }
     }
-    return; // Important: ensure all paths handle the request
+    return;
   }
 
   // Handle other unknown paths
