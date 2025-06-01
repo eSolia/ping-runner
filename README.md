@@ -9,8 +9,8 @@ This guide walks you through setting up and deploying a Deno Deploy script for m
 
 This script uses **Environment Variables** for configuration and **Deno KV (Key-Value Store)** for persistent storage of `SITE_CONFIG` and `lastCheckedTime` for each feed.
 
-1.  **Update `main.js`:**
-    * Copy and paste the entire script provided earlier into your `main.js` file.
+1.  **Review `main.js`:**
+    * The `main.js` in the root of the project is the script that Deno Deploy will run, to check your feeds and ping ping-o-matic.
 
 2.  **Inspect Your JSON Feeds and Adjust Date Fields (Crucial):**
     * Go to each of your JSON feed URLs and inspect the structure of a typical post object.
@@ -36,17 +36,7 @@ This script uses **Environment Variables** for configuration and **Deno KV (Key-
 3.  **Set Environment Variables in Deno Deploy:**
 
     * Access your Deno Deploy project settings.
-    * Navigate to "Environment Variables" (or similar section).
-
-    * **`ADMIN_USERNAME`**:
-        * Add a new variable named `ADMIN_USERNAME`.
-        * Set its value to your desired username for accessing the admin UI.
-        * Mark this variable as **Secret**.
-
-    * **`ADMIN_PASSWORD`**:
-        * Add a new variable named `ADMIN_PASSWORD`.
-        * Set its value to your desired password for accessing the admin UI.
-        * Mark this variable as **Secret**.
+    * Navigate to "Environment Variables" (or similar if they renamed it).
 
     * **IndexNow API Keys**:
         * For *each unique IndexNow API key* you have, add a separate environment variable.
