@@ -1,5 +1,5 @@
 // main.ts - Deno Deploy script for multi-site IndexNow and Ping-O-Matic submission
-import './cron.ts'; // Assuming cron.ts handles scheduling logic separately
+import './cron.ts'; // Assuming cron.ts handles scheduling logic separately, if needed by you
 
 // --- Type Definitions ---
 // Define interfaces for the structure of your configuration and post data
@@ -9,11 +9,11 @@ interface PingOMaticConfig {
   rssUrl: string;
 }
 
-interface SiteConfig {
+export interface SiteConfig { // Exported in case cron.ts needs it
   id: string;
   host: string;
   feedUrl: string;
-  indexNowKeyEnv: string;
+  indexNowKeyEnv: string; // This will be the name of the env variable holding the actual key
   pingOMatic?: PingOMaticConfig; // '?' makes it optional
 }
 
@@ -26,7 +26,6 @@ interface Post {
   date?: string;
   date_modified?: string;
   updated_at?: string;
-  // Add other properties you might access, e.g., title: string; content_html: string;
   [key: string]: unknown; // Allow for other unknown properties
 }
 
@@ -44,7 +43,6 @@ const TWENTY_FOUR_HOURS_IN_MS: number = 24 * 60 * 60 * 1000;
 const LAST_CHECK_KEY_PREFIX: string = "last_check_"; // Prefix for Deno KV keys
 
 // --- Deno KV (Key-Value Store) for persistence ---
-// Deno.Kv will infer its type, but explicitly typing helps clarity
 const kv: Deno.Kv = await Deno.openKv();
 
 // --- Helper Function to fetch JSON ---
@@ -54,9 +52,8 @@ async function fetchJsonFeed(url: string): Promise<JsonFeed | null> {
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    // Type assertion 'as JsonFeed' because fetch().json() returns Promise<any>
-    return (await response.json()) as JsonFeed;
-  } catch (error: unknown) { // Use 'unknown' for caught errors as they can be anything
+    return (await response.json()) as JsonFeed; // Type assertion
+  } catch (error: unknown) {
     console.error(`Error fetching JSON feed from ${url}:`, error);
     return null;
   }
@@ -76,22 +73,19 @@ async function setLastChecked(feedId: string, timestamp: Date): Promise<void> {
 // --- Helper Function to check if a post is new or updated ---
 function isPostNewOrUpdated(post: Post, lastCheckedTime: Date | null): boolean {
   // IMPORTANT: Adapt these date fields to match your JSON feed's structure.
-  // Using 'as string' to tell TypeScript these properties are expected to be strings
   const publishedDate: Date = new Date(
     (post.date_published || post.published || post.date) as string,
   );
   const updatedDate: Date = new Date(
     (post.date_modified || post.updated_at || publishedDate.toISOString()) as string,
-  ); // Fallback to publishedDate's ISO string
+  ); // Fallback to publishedDate's ISO string if no explicit updated date
 
   const currentTime: number = Date.now();
 
-  // If there's no lastCheckedTime (first run), consider anything within 24h as new
   if (!lastCheckedTime) {
     return (currentTime - publishedDate.getTime()) <= TWENTY_FOUR_HOURS_IN_MS;
   }
 
-  // Check if published or updated after the last check
   return (publishedDate.getTime() > lastCheckedTime.getTime()) ||
          (updatedDate.getTime() > lastCheckedTime.getTime());
 }
@@ -133,7 +127,6 @@ async function pingIndexNow(host: string, apiKey: string, urls: string[]): Promi
 
 // --- Function to ping Ping-O-Matic ---
 async function pingPingOMatic(siteConfig: SiteConfig): Promise<void> {
-  // Check if pingOMatic property exists and is not undefined
   if (!siteConfig.pingOMatic) {
     console.warn(`[${siteConfig.id}] Ping-O-Matic configuration is missing. Skipping.`);
     return;
@@ -147,7 +140,6 @@ async function pingPingOMatic(siteConfig: SiteConfig): Promise<void> {
     return;
   }
 
-  // URL-encode all parameters
   const encodedTitle: string = encodeURIComponent(title);
   const encodedBlogUrl: string = encodeURIComponent(blogUrl);
   const encodedRssUrl: string = encodeURIComponent(rssUrl);
@@ -160,7 +152,6 @@ async function pingPingOMatic(siteConfig: SiteConfig): Promise<void> {
 
     if (response.ok) {
       const responseText: string = await response.text();
-      // pingPingOMatic does not take updatedPostUrl as parameter in this implementation
       console.log(
         `[${siteConfig.id}] Successfully pinged Ping-O-Matic. Response: ${
           responseText.substring(0, 100)
@@ -182,7 +173,7 @@ async function processFeed(siteConfig: SiteConfig): Promise<void> {
   console.log(`Processing feed for ${siteConfig.id} (${siteConfig.feedUrl})...`);
 
   const lastCheckedTime: Date | null = await getLastChecked(siteConfig.id);
-  const currentRunTime: Date = new Date(); // Capture time at the start of this run
+  const currentRunTime: Date = new Date();
 
   const feed: JsonFeed | null = await fetchJsonFeed(siteConfig.feedUrl);
 
@@ -192,13 +183,13 @@ async function processFeed(siteConfig: SiteConfig): Promise<void> {
   }
 
   const urlsToIndexNow: string[] = [];
-  let hasUpdatedPostsForPingOMatic: boolean = false; // Flag to decide if we need to ping Ping-O-Matic
+  let hasUpdatedPostsForPingOMatic: boolean = false;
 
   for (const post of feed.items) {
     if (isPostNewOrUpdated(post, lastCheckedTime)) {
       if (post.url) {
         urlsToIndexNow.push(post.url);
-        hasUpdatedPostsForPingOMatic = true; // Mark that at least one post was new/updated
+        hasUpdatedPostsForPingOMatic = true;
       } else {
         console.warn(
           `[${siteConfig.id}] Post found without a 'url' field. Skipping for IndexNow/Ping-O-Matic:`,
@@ -208,7 +199,6 @@ async function processFeed(siteConfig: SiteConfig): Promise<void> {
     }
   }
 
-  // Get the IndexNow API key from environment variables
   const indexNowApiKey: string | undefined = Deno.env.get(siteConfig.indexNowKeyEnv);
   if (!indexNowApiKey) {
     console.error(
@@ -218,47 +208,51 @@ async function processFeed(siteConfig: SiteConfig): Promise<void> {
     await pingIndexNow(siteConfig.host, indexNowApiKey, urlsToIndexNow);
   }
 
-  // Ping Ping-O-Matic only if there were new/updated posts
   if (hasUpdatedPostsForPingOMatic && siteConfig.pingOMatic) {
     await pingPingOMatic(siteConfig);
   } else {
     console.log(`[${siteConfig.id}] No new or updated posts for Ping-O-Matic.`);
   }
 
-  // Update the last checked timestamp only if the feed was successfully processed
   await setLastChecked(siteConfig.id, currentRunTime);
   console.log(`[${siteConfig.id}] Processing complete. Last checked timestamp updated.`);
 }
 
 // --- Deno Deploy Entry Point ---
-// This will run the main function when the script is deployed and executed by the cron job.
 addEventListener("fetch", async (event: FetchEvent) => {
   event.respondWith(
-    new Response("Deno Deploy Multi-Site IndexNow/Ping-O-Matic checker running...", { status: 200 }),
+    new Response("Deno Deploy Multi-Site IndexNow/Ping-O-Matic checker running... (Check logs)", { status: 200 }),
   );
 
+  console.log(`[${new Date().toISOString()}] Fetch event received. Starting background processing.`);
+
   try {
+    // THIS IS THE KEY PART FOR THIS VERSION: Read SITE_CONFIG from an environment variable
     const siteConfigJson: string | undefined = Deno.env.get("SITE_CONFIG");
     if (!siteConfigJson) {
-      console.error("Environment variable 'SITE_CONFIG' is not set. Please configure your site feeds.");
-      return;
+      console.error(`[${new Date().toISOString()}] Environment variable 'SITE_CONFIG' is NOT set. Please configure your site feeds.`);
+      return; // Stop execution if no config is found
     }
 
     const siteConfigs: SiteConfig[] = JSON.parse(siteConfigJson);
 
     if (!Array.isArray(siteConfigs) || siteConfigs.length === 0) {
-      console.error("SITE_CONFIG is not a valid array or is empty.");
-      return;
+      console.error(`[${new Date().toISOString()}] SITE_CONFIG is not a valid JSON array or is empty.`);
+      return; // Stop execution if config is invalid
     }
 
-    // Process each site/feed concurrently
+    console.log(`[${new Date().toISOString()}] Retrieved ${siteConfigs.length} site configurations from environment variable.`);
+
     const processingPromises: Promise<void>[] = siteConfigs.map(
       (config: SiteConfig) => processFeed(config),
     );
     await Promise.all(processingPromises);
 
-    console.log("All site feeds processed.");
+    console.log(`[${new Date().toISOString()}] All site feeds processed.`);
   } catch (error: unknown) {
-    console.error("Error in main execution loop:", error);
+    console.error(`[${new Date().toISOString()}] Error in main execution loop:`, error);
+    if (error instanceof Error) {
+        console.error(error.stack); // Log full stack for detailed errors
+    }
   }
 });
