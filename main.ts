@@ -1,32 +1,29 @@
 // main.ts - Deno Deploy script for multi-site IndexNow and Ping-O-Matic submission
-import './cron.ts'; // Assuming cron.ts handles scheduling logic separately, if needed by you
+import { decode } from "https://deno.land/std@0.224.0/encoding/base64.ts"; // For Basic Auth of Simple Admin UI
 
 // --- Type Definitions ---
-// Define interfaces for the structure of your configuration and post data
 interface PingOMaticConfig {
   title: string;
   blogUrl: string;
   rssUrl: string;
 }
 
-export interface SiteConfig { // Exported in case cron.ts needs it
+export interface SiteConfig {
   id: string;
   host: string;
   feedUrl: string;
-  indexNowKeyEnv: string; // This will be the name of the env variable holding the actual key
-  pingOMatic?: PingOMaticConfig; // '?' makes it optional
+  indexNowKeyEnv: string;
+  pingOMatic?: PingOMaticConfig;
 }
 
-// Define a basic structure for your JSON feed items (posts)
-// You might need to expand this based on your actual feed structure
 interface Post {
-  url?: string; // Optional, as you have a warning if it's missing
+  url?: string;
   date_published?: string;
   published?: string;
   date?: string;
   date_modified?: string;
   updated_at?: string;
-  [key: string]: unknown; // Allow for other unknown properties
+  [key: string]: unknown;
 }
 
 interface JsonFeed {
@@ -35,50 +32,59 @@ interface JsonFeed {
   home_page_url: string;
   feed_url: string;
   items: Post[];
-  // Add other properties from your feed if necessary
 }
 
 // --- Constants ---
 const TWENTY_FOUR_HOURS_IN_MS: number = 24 * 60 * 60 * 1000;
-const LAST_CHECK_KEY_PREFIX: string = "last_check_"; // Prefix for Deno KV keys
+const LAST_CHECK_KEY_PREFIX: string = "last_check_";
+const SITE_CONFIG_KV_KEY = ["site_configs"]; // Key for storing all site configs in Deno KV
 
 // --- Deno KV (Key-Value Store) for persistence ---
 const kv: Deno.Kv = await Deno.openKv();
 
-// --- Helper Function to fetch JSON ---
+// --- KV Helper Functions for Site Config ---
+async function getSiteConfigs(): Promise<SiteConfig[]> {
+  const result: Deno.KvEntryMaybe<SiteConfig[]> = await kv.get(SITE_CONFIG_KV_KEY);
+  return result.value || [];
+}
+
+async function setSiteConfigs(configs: SiteConfig[]): Promise<void> {
+  await kv.set(SITE_CONFIG_KV_KEY, configs);
+}
+
+// --- Helper Function to fetch Feed JSON ---
 async function fetchJsonFeed(url: string): Promise<JsonFeed | null> {
   try {
     const response: Response = await fetch(url);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    return (await response.json()) as JsonFeed; // Type assertion
+    return (await response.json()) as JsonFeed;
   } catch (error: unknown) {
     console.error(`Error fetching JSON feed from ${url}:`, error);
     return null;
   }
 }
 
-// --- Helper Function to get last checked timestamp ---
+// --- Helper Function to get last checked timestamp of Feed ---
 async function getLastChecked(feedId: string): Promise<Date | null> {
   const result: Deno.KvEntryMaybe<string> = await kv.get([LAST_CHECK_KEY_PREFIX + feedId]);
   return result.value ? new Date(result.value) : null;
 }
 
-// --- Helper Function to set last checked timestamp ---
+// --- Helper Function to set last checked timestamp of Feed ---
 async function setLastChecked(feedId: string, timestamp: Date): Promise<void> {
   await kv.set([LAST_CHECK_KEY_PREFIX + feedId], timestamp.toISOString());
 }
 
-// --- Helper Function to check if a post is new or updated ---
+// --- Helper Function to check if a listed post is new or updated ---
 function isPostNewOrUpdated(post: Post, lastCheckedTime: Date | null): boolean {
-  // IMPORTANT: Adapt these date fields to match your JSON feed's structure.
   const publishedDate: Date = new Date(
     (post.date_published || post.published || post.date) as string,
   );
   const updatedDate: Date = new Date(
     (post.date_modified || post.updated_at || publishedDate.toISOString()) as string,
-  ); // Fallback to publishedDate's ISO string if no explicit updated date
+  );
 
   const currentTime: number = Date.now();
 
@@ -218,41 +224,224 @@ async function processFeed(siteConfig: SiteConfig): Promise<void> {
   console.log(`[${siteConfig.id}] Processing complete. Last checked timestamp updated.`);
 }
 
+// --- Basic Authentication Helper ---
+function basicAuth(request: Request): Response | null {
+  const ADMIN_USERNAME = Deno.env.get("ADMIN_USERNAME");
+  const ADMIN_PASSWORD = Deno.env.get("ADMIN_PASSWORD");
+
+  if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
+    console.error("ADMIN_USERNAME or ADMIN_PASSWORD environment variables are not set for Basic Auth.");
+    return new Response("Server configuration error: Admin credentials not set.", { status: 500 });
+  }
+
+  const authHeader = request.headers.get("Authorization");
+  if (!authHeader || !authHeader.startsWith("Basic ")) {
+    return new Response("Unauthorized", {
+      status: 401,
+      headers: { "WWW-Authenticate": 'Basic realm="Admin"' },
+    });
+  }
+
+  const encoded = authHeader.substring(6); // "Basic ".length is 6
+  const decoded = new TextDecoder().decode(decode(encoded));
+  const [username, password] = decoded.split(":");
+
+  if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+    return null; // Authorized
+  } else {
+    return new Response("Unauthorized", {
+      status: 401,
+      headers: { "WWW-Authenticate": 'Basic realm="Admin"' },
+    });
+  }
+}
+
+// --- Admin UI Rendering ---
+function renderAdminPage(configs: SiteConfig[]): Response {
+  const configJson = JSON.stringify(configs, null, 2); // Pretty print JSON
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Deno Deploy Site Config Admin</title>
+        <style>
+            body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+            h1 { color: #0056b3; }
+            textarea {
+                width: 90%;
+                height: 400px;
+                padding: 10px;
+                margin-bottom: 10px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                font-family: monospace;
+                white-space: pre;
+                overflow-wrap: normal;
+                overflow-x: auto;
+            }
+            button {
+                padding: 10px 20px;
+                background-color: #007bff;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+            button:hover { background-color: #0056b3; }
+            .message {
+                margin-top: 15px;
+                padding: 10px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            .success { background-color: #d4edda; color: #155724; border-color: #c3e6cb; }
+            .error { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+        </style>
+    </head>
+    <body>
+        <h1>Deno Deploy Site Configuration</h1>
+        <p>Edit the JSON below to manage your site configurations. Save changes to update Deno KV.</p>
+        <form id="configForm" method="POST" action="/update">
+            <textarea id="siteConfig" name="siteConfig">${configJson}</textarea>
+            <br>
+            <button type="submit">Save Configuration</button>
+        </form>
+        <div id="message" class="message"></div>
+
+        <script>
+            const form = document.getElementById('configForm');
+            const messageDiv = document.getElementById('message');
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                messageDiv.textContent = '';
+                messageDiv.className = 'message';
+
+                try {
+                    const textarea = document.getElementById('siteConfig');
+                    const configData = textarea.value;
+
+                    // Basic JSON validation before sending
+                    try {
+                        JSON.parse(configData);
+                    } catch (jsonError) {
+                        messageDiv.textContent = 'JSON Syntax Error: ' + jsonError.message;
+                        messageDiv.classList.add('error');
+                        return;
+                    }
+
+                    const response = await fetch('/update', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: configData
+                    });
+
+                    if (response.ok) {
+                        const responseText = await response.text();
+                        messageDiv.textContent = 'Configuration saved successfully! ' + responseText;
+                        messageDiv.classList.add('success');
+                    } else {
+                        const errorText = await response.text();
+                        messageDiv.textContent = 'Failed to save configuration: ' + response.status + ' ' + errorText;
+                        messageDiv.classList.add('error');
+                    }
+                } catch (error) {
+                    messageDiv.textContent = 'An unexpected error occurred: ' + error.message;
+                    messageDiv.classList.add('error');
+                }
+            });
+        </script>
+    </body>
+    </html>
+  `;
+  return new Response(html, {
+    headers: { "Content-Type": "text/html" },
+  });
+}
+
 // --- Deno Deploy Entry Point ---
 addEventListener("fetch", async (event: FetchEvent) => {
-  event.respondWith(
-    new Response("Deno Deploy Multi-Site IndexNow/Ping-O-Matic checker running... (Check logs)", { status: 200 }),
-  );
+  const request = event.request;
+  const url = new URL(request.url);
 
-  console.log(`[${new Date().toISOString()}] Fetch event received. Starting background processing.`);
+  console.log(`[${new Date().toISOString()}] Request received: ${request.method} ${url.pathname}`);
 
-  try {
-    // THIS IS THE KEY PART FOR THIS VERSION: Read SITE_CONFIG from an environment variable
-    const siteConfigJson: string | undefined = Deno.env.get("SITE_CONFIG");
-    if (!siteConfigJson) {
-      console.error(`[${new Date().toISOString()}] Environment variable 'SITE_CONFIG' is NOT set. Please configure your site feeds.`);
-      return; // Stop execution if no config is found
+  // --- Admin UI Routes ---
+  if (url.pathname === "/admin") {
+    const authResponse = basicAuth(request);
+    if (authResponse) {
+      event.respondWith(authResponse);
+      return;
     }
-
-    const siteConfigs: SiteConfig[] = JSON.parse(siteConfigJson);
-
-    if (!Array.isArray(siteConfigs) || siteConfigs.length === 0) {
-      console.error(`[${new Date().toISOString()}] SITE_CONFIG is not a valid JSON array or is empty.`);
-      return; // Stop execution if config is invalid
-    }
-
-    console.log(`[${new Date().toISOString()}] Retrieved ${siteConfigs.length} site configurations from environment variable.`);
-
-    const processingPromises: Promise<void>[] = siteConfigs.map(
-      (config: SiteConfig) => processFeed(config),
-    );
-    await Promise.all(processingPromises);
-
-    console.log(`[${new Date().toISOString()}] All site feeds processed.`);
-  } catch (error: unknown) {
-    console.error(`[${new Date().toISOString()}] Error in main execution loop:`, error);
-    if (error instanceof Error) {
-        console.error(error.stack); // Log full stack for detailed errors
-    }
+    const currentConfigs = await getSiteConfigs();
+    event.respondWith(renderAdminPage(currentConfigs));
+    return;
   }
+
+  if (url.pathname === "/update" && request.method === "POST") {
+    const authResponse = basicAuth(request);
+    if (authResponse) {
+      event.respondWith(authResponse);
+      return;
+    }
+
+    try {
+      const newConfigs: SiteConfig[] = await request.json(); // Expect JSON payload
+      if (!Array.isArray(newConfigs)) {
+        throw new Error("Invalid JSON: Expected an array of site configurations.");
+      }
+      await setSiteConfigs(newConfigs);
+      console.log(`[${new Date().toISOString()}] Site configurations updated successfully in Deno KV.`);
+      event.respondWith(new Response("Configuration saved successfully", { status: 200 }));
+    } catch (error: unknown) {
+      console.error(`[${new Date().toISOString()}] Error updating configurations:`, error);
+      event.respondWith(
+        new Response(`Error: ${(error as Error).message || "Invalid configuration format."}`, { status: 400 }),
+      );
+    }
+    return;
+  }
+
+  // --- Main Cron Job Execution (for '/') ---
+  if (url.pathname === "/") {
+    // Respond immediately for cron jobs, then run background task
+    event.respondWith(
+      new Response("Deno Deploy Multi-Site IndexNow/Ping-O-Matic checker running... (Check logs for details)", { status: 200 }),
+    );
+
+    console.log(`[${new Date().toISOString()}] Starting background processing for cron job.`);
+
+    try {
+      const siteConfigs: SiteConfig[] = await getSiteConfigs(); // Read from KV
+
+      if (!Array.isArray(siteConfigs) || siteConfigs.length === 0) {
+        console.warn(`[${new Date().toISOString()}] No site configurations found in Deno KV. Skipping cron job processing.`);
+        // No return here, as we already responded to the event.
+        return;
+      }
+
+      console.log(`[${new Date().toISOString()}] Retrieved ${siteConfigs.length} site configurations from Deno KV.`);
+
+      const processingPromises: Promise<void>[] = siteConfigs.map(
+        (config: SiteConfig) => processFeed(config),
+      );
+      await Promise.all(processingPromises);
+
+      console.log(`[${new Date().toISOString()}] All site feeds processed.`);
+    } catch (error: unknown) {
+      console.error(`[${new Date().toISOString()}] Error in main cron execution loop:`, error);
+      if (error instanceof Error) {
+          console.error(error.stack);
+      }
+    }
+    return; // Important: ensure all paths handle the request
+  }
+
+  // Handle other unknown paths
+  event.respondWith(new Response("Not Found", { status: 404 }));
 });
