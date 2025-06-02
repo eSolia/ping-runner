@@ -1,5 +1,5 @@
 # ping-runner
-Pings indexnow, ping-o-matic and webSub for new items in rss feeds from listed sites.
+Runs on Deno Deploy using its KV store. Pings indexnow, ping-o-matic and webSub for new items in rss feeds from listed sites.
 
 ## Setup and Deployment Instructions
 
