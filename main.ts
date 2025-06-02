@@ -39,7 +39,7 @@ interface JsonFeed {
 }
 
 // --- Constants ---
-const TWENTY_FOUR_HOURS_IN_MS: number = 240 * 60 * 60 * 1000;
+const TWENTY_FOUR_HOURS_IN_MS: number = 24 * 60 * 60 * 1000;
 const LAST_CHECK_KEY_PREFIX: string = "last_check_";
 const SITE_CONFIG_KV_KEY = ["site_configs"]; // Key for storing all site configs in Deno KV
 
