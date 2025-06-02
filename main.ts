@@ -1,5 +1,7 @@
 // main.ts - Deno Deploy script for multi-site IndexNow and Ping-O-Matic submission
-// CORRECTED IMPORT: decodeBase64 instead of decode
+// Import cron to schedule
+import './cron.ts';
+// Import decodeBase64 for basic auth
 import { decodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
 // --- Type Definitions ---
