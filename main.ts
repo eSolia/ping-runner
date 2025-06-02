@@ -15,6 +15,7 @@ export interface SiteConfig {
   feedUrl: string;
   indexNowKeyEnv: string;
   pingOMatic?: PingOMaticConfig;
+  webSubHubUrl?: string; // Optional: URL of the WebSub hub to notify
 }
 
 interface Post {
@@ -175,6 +176,34 @@ async function pingPingOMatic(siteConfig: SiteConfig): Promise<void> {
   }
 }
 
+// Function to notify Google's public websub hub
+async function notifyWebSubHub(feedUrl: string, hubUrl: string = "https://pubsubhubbub.appspot.com/publish"): Promise<void> {
+  const params = new URLSearchParams({
+    'hub.mode': 'publish',
+    'hub.url': feedUrl
+  });
+
+  try {
+    const response = await fetch(hubUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
+
+    if (response.ok) {
+      console.log(`Successfully notified WebSub hub (${hubUrl}) for feed: ${feedUrl}`);
+    } else {
+      const errorText = await response.text();
+      console.error(`Failed to notify WebSub hub (${hubUrl}) for feed: ${feedUrl}. Status: ${response.status}, Response: ${errorText}`);
+    }
+  } catch (error: unknown) {
+    console.error(`Error notifying WebSub hub (${hubUrl}) for feed: ${feedUrl}:`, error);
+  }
+}
+
+
 // --- Main execution function for a single feed ---
 async function processFeed(siteConfig: SiteConfig): Promise<void> {
   console.log(`Processing feed for ${siteConfig.id} (${siteConfig.feedUrl})...`);
@@ -215,10 +244,17 @@ async function processFeed(siteConfig: SiteConfig): Promise<void> {
     await pingIndexNow(siteConfig.host, indexNowApiKey, urlsToIndexNow);
   }
 
-  if (hasUpdatedPostsForPingOMatic && siteConfig.pingOMatic) {
-    await pingPingOMatic(siteConfig);
+  // After other pings, if there were updates
+  if (hasUpdatedPostsForPingOMatic) { // Reusing this flag to indicate *any* updates
+    if (siteConfig.pingOMatic) {
+        await pingPingOMatic(siteConfig);
+    }
+    // Notify WebSub hub if configured
+    if (siteConfig.webSubHubUrl) {
+      await notifyWebSubHub(siteConfig.feedUrl, siteConfig.webSubHubUrl);
+    }
   } else {
-    console.log(`[${siteConfig.id}] No new or updated posts for Ping-O-Matic.`);
+    console.log(`[${siteConfig.id}] No new or updated posts.`); // Updated message
   }
 
   await setLastChecked(siteConfig.id, currentRunTime);
