@@ -1,10 +1,11 @@
 // main.ts - Deno Deploy script for multi-site IndexNow and Ping-O-Matic submission
-// Import cron to schedule
+// Import cron to schedule the script execution
 import './cron.ts';
 // Import decodeBase64 for basic auth
 import { decodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
 // --- Type Definitions ---
+// Define interfaces for the structure of your configuration and post data
 interface PingOMaticConfig {
   title: string;
   blogUrl: string;
@@ -19,15 +20,20 @@ export interface SiteConfig {
   pingOMatic?: PingOMaticConfig;
   webSubHubUrl?: string; // Optional: URL of the WebSub hub to notify
 }
-
+// Post defines a basic structure for JSON feed items (posts)
+// Expand based on actual feed structure
 interface Post {
-  url?: string;
+  url?: string; // Optional, there is a warning if it's missing
   date_published?: string;
   published?: string;
   date?: string;
   date_modified?: string;
   updated_at?: string;
-  [key: string]: unknown;
+  title?: string;
+  content_html?: string;
+  content_text?: string;
+  summary?: string;
+  [key: string]: unknown; // Allow other properties
 }
 
 interface JsonFeed {
@@ -40,10 +46,11 @@ interface JsonFeed {
 
 // --- Constants ---
 const TWENTY_FOUR_HOURS_IN_MS: number = 24 * 60 * 60 * 1000;
-const LAST_CHECK_KEY_PREFIX: string = "last_check_";
+const LAST_CHECK_KEY_PREFIX: string = "last_check_"; // Prefix for last checked timestamps in Deno KV
 const SITE_CONFIG_KV_KEY = ["site_configs"]; // Key for storing all site configs in Deno KV
 
 // --- Deno KV (Key-Value Store) for persistence ---
+// Deno.Kv will infer its type, but explicitly typing helps clarity
 const kv: Deno.Kv = await Deno.openKv();
 
 // --- KV Helper Functions for Site Config ---
@@ -63,8 +70,9 @@ async function fetchJsonFeed(url: string): Promise<JsonFeed | null> {
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
+    // Type assertion 'as JsonFeed' because fetch().json() returns Promise<any>
     return (await response.json()) as JsonFeed;
-  } catch (error: unknown) {
+  } catch (error: unknown) { // Use 'unknown' for caught errors as they can be anything
     console.error(`Error fetching JSON feed from ${url}:`, error);
     return null;
   }
@@ -83,19 +91,22 @@ async function setLastChecked(feedId: string, timestamp: Date): Promise<void> {
 
 // --- Helper Function to check if a post is new or updated ---
 function isPostNewOrUpdated(post: Post, lastCheckedTime: Date | null): boolean {
+  // IMPORTANT: Adapt these date fields to match your JSON feed's structure.
+  // Using 'as string' to tell TypeScript these properties are expected to be strings
   const publishedDate: Date = new Date(
     (post.date_published || post.published || post.date) as string,
   );
   const updatedDate: Date = new Date(
     (post.date_modified || post.updated_at || publishedDate.toISOString()) as string,
-  );
+  ); // Fallback to publishedDate's ISO string
 
   const currentTime: number = Date.now();
 
+  // If lastCheckedTime is null (first run), consider the post new if it's within the last 24 hours
   if (!lastCheckedTime) {
     return (currentTime - publishedDate.getTime()) <= TWENTY_FOUR_HOURS_IN_MS;
   }
-
+  // Check if published or updated after the last check
   return (publishedDate.getTime() > lastCheckedTime.getTime()) ||
          (updatedDate.getTime() > lastCheckedTime.getTime());
 }
@@ -141,6 +152,7 @@ async function pingIndexNow(host: string, apiKey: string, urls: string[]): Promi
 
 // --- Function to ping Ping-O-Matic ---
 async function pingPingOMatic(siteConfig: SiteConfig): Promise<void> {
+  // Check if pingOMatic property exists and is not undefined
   if (!siteConfig.pingOMatic) {
     console.warn(`[${siteConfig.id}] Ping-O-Matic configuration is missing. Skipping.`);
     return;
@@ -153,7 +165,7 @@ async function pingPingOMatic(siteConfig: SiteConfig): Promise<void> {
     );
     return;
   }
-
+  // Encode the parameters to ensure they are URL-safe
   const encodedTitle: string = encodeURIComponent(title);
   const encodedBlogUrl: string = encodeURIComponent(blogUrl);
   const encodedRssUrl: string = encodeURIComponent(rssUrl);
