@@ -113,6 +113,10 @@ async function pingIndexNow(host: string, apiKey: string, urls: string[]): Promi
     urlList: urls.map((url: string) => ({ loc: url })),
   };
 
+  // --- START DEBUG ---
+  console.log(`[${host}] IndexNow Payload for debugging: ${JSON.stringify(payload, null, 2)}`);
+  // --- END DEBUG ---
+
   try {
     const response: Response = await fetch("https://api.indexnow.org/IndexNow", {
       method: "POST",
