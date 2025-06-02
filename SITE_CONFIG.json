@@ -1,22 +1,38 @@
 [
   {
-  "id": "esolia-blog-en", 
-  "host": "blog.esolia.pro", 
-  "feedUrl": "https://blog.esolia.pro/feed.en.json", 
-  "indexNowKeyEnv": "INDEXNOW_API_ESOLIABLOG_1", 
-  "pingOMatic": {
-    "title": "eSolia Tech It Easy Blog", 
-    "blogUrl": "https://blog.esolia.pro/en/", 
-    "rssUrl": "https://blog.esolia.pro/feed.en.xml"}
-  }, 
+    "id": "esolia-blog-en",
+    "host": "blog.esolia.pro",
+    "feedUrl": "https://blog.esolia.pro/feed.en.json",
+    "indexNowKeyEnv": "INDEXNOW_API_ESOLIABLOG_1",
+    "pingOMatic": {
+      "title": "eSolia Tech It Easy Blog",
+      "blogUrl": "https://blog.esolia.pro/en/",
+      "rssUrl": "https://blog.esolia.pro/feed.en.xml"
+    },
+    "webSubHubUrl": "https://pubsubhubbub.appspot.com/publish"
+  },
   {
-  "id": "esolia-blog-ja", 
-  "host": "blog.esolia.pro", 
-  "feedUrl": "https://blog.esolia.pro/feed.ja.json", 
-  "indexNowKeyEnv": "INDEXNOW_API_ESOLIABLOG_1", 
-  "pingOMatic": {
-    "title": "イソリア Tech It Easy ブログ", 
-    "blogUrl": "https://blog.esolia.pro", 
-    "rssUrl": "https://blog.esolia.pro/feed.ja.xml"}
+    "id": "esolia-blog-ja",
+    "host": "blog.esolia.pro",
+    "feedUrl": "https://blog.esolia.pro/feed.ja.json",
+    "indexNowKeyEnv": "INDEXNOW_API_ESOLIABLOG_1",
+    "pingOMatic": {
+      "title": "イソリア Tech It Easy ブログ",
+      "blogUrl": "https://blog.esolia.pro",
+      "rssUrl": "https://blog.esolia.pro/feed.ja.xml"
+    },
+    "webSubHubUrl": "https://pubsubhubbub.appspot.com/publish"
+  },
+  {
+    "id": "cogley-jp",
+    "host": "cogley.jp",
+    "feedUrl": "https://cogley.jp/feed.json",
+    "indexNowKeyEnv": "INDEXNOW_API_COGLEYBLOG_1",
+    "pingOMatic": {
+      "title": "blog Cogley",
+      "blogUrl": "https://cogley.jp",
+      "rssUrl": "https://cogley.jp/feed.xml"
+    },
+    "webSubHubUrl": "https://pubsubhubbub.appspot.com/publish"
   }
 ]
